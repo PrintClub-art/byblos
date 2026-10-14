@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roulette de la Chance</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap');
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Poppins',system-ui,sans-serif;
+  color:#fff;
+  min-height:100vh;
+  overflow-x:hidden;
+  background:linear-gradient(135deg,#1e1b4b,#312e81,#4c1d95,#701a75);
+  background-size:400% 400%;
+  animation:bgShift 18s ease-in-out infinite;
+  display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+  padding:12px;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+@keyframes bgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+canvas.layer{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#bgCanvas{z-index:0}
+#fxCanvas{z-index:90}
+
+/* ---------- entrance helpers ---------- */
+.pop-in{opacity:0;animation:popIn .9s cubic-bezier(.2,1.4,.4,1) forwards}
+@keyframes popIn{0%{opacity:0;transform:translateY(30px) scale(.6)}100%{opacity:1;transform:none}}
+
+/* ---------- header ---------- */
+header{position:relative;z-index:2;width:100%;max-width:520px;display:flex;flex-direction:column;align-items:center;padding:8px 0 0}
+.logo{height:64px;width:auto;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(0,0,0,.45));animation:logoFloat 3.6s ease-in-out infinite}
+@keyframes logoFloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-8px) rotate(1.5deg) scale(1.04)}}
+h1{
+  margin-top:6px;font-size:clamp(1.3rem,5vw,1.9rem);font-weight:800;letter-spacing:.06em;text-align:center;
+  background:linear-gradient(90deg,#fde047,#fff,#f59e0b,#fff,#fde047);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:shimmer 4s linear infinite;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));
+}
+@keyframes shimmer{to{background-position:-300% 0}}
+.sub{font-size:.75rem;color:#c7d2fe;margin-top:4px;text-align:center;animation:subFade 3s ease-in-out infinite}
+@keyframes subFade{0%,100%{opacity:.65}50%{opacity:1}}
+
+/* ---------- mute button ---------- */
+#muteBtn{
+  position:fixed;top:12px;right:12px;z-index:60;width:44px;height:44px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.12);backdrop-filter:blur(8px);
+  color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:transform .25s cubic-bezier(.3,1.8,.5,1),background .2s;
+  animation:popIn .8s .9s both cubic-bezier(.2,1.4,.4,1);
+}
+#muteBtn:hover{transform:scale(1.15) rotate(-8deg);background:rgba(255,255,255,.25)}
+#muteBtn:active{transform:scale(.88)}
+#muteBtn.beat .ico{animation:beat .9s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+
+/* ---------- wheel ---------- */
+main{position:relative;z-index:2;width:100%;display:flex;flex-direction:column;align-items:center;margin:auto 0}
+.stage{
+  --size:min(92vw,56vh,500px);
+  position:relative;width:var(--size);height:var(--size);margin:10px 0;
+  animation:wheelIn 1.6s cubic-bezier(.17,.9,.25,1.15) both;
+}
+@keyframes wheelIn{
+  0%{opacity:0;transform:scale(.1) rotate(-540deg)}
+  60%{opacity:1}
+  100%{opacity:1;transform:none}
+}
+.stage.bump{animation:bump .7s cubic-bezier(.3,1.6,.5,1)}
+@keyframes bump{0%{transform:scale(1)}35%{transform:scale(1.07) rotate(-1.2deg)}70%{transform:scale(.98) rotate(.8deg)}100%{transform:scale(1)}}
+.stage.shake{animation:shake .6s ease-in-out}
+@keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-10px) rotate(-1deg)}30%{transform:translateX(9px) rotate(1deg)}45%{transform:translateX(-7px)}60%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+#wheelCanvas{width:100%;height:100%;display:block}
+
+#spinBtn{
+  position:absolute;left:50%;top:50%;width:21%;aspect-ratio:1;transform:translate(-50%,-50%);
+  border-radius:50%;border:4px solid #fff;cursor:pointer;
+  background:radial-gradient(circle at 35% 30%,#fef08a,#facc15 40%,#d97706);
+  color:#1e1b4b;font:800 .62rem/1 'Poppins',sans-serif;letter-spacing:.02em;
+  box-shadow:0 8px 20px rgba(0,0,0,.55),inset 0 -6px 10px rgba(180,83,9,.5),inset 0 4px 8px rgba(255,255,255,.7);
+  animation:hubPulse 1.6s ease-in-out infinite;
+  transition:filter .3s,opacity .3s;
+}
+#spinBtn::before,#spinBtn::after{
+  content:"";position:absolute;inset:-4px;border-radius:50%;border:3px solid rgba(253,224,71,.8);
+  animation:ripple 2s ease-out infinite;pointer-events:none;
+}
+#spinBtn::after{animation-delay:1s}
+#spinBtn span{display:inline-block;animation:txtWobble 1.6s ease-in-out infinite}
+@keyframes hubPulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.09)}}
+@keyframes ripple{0%{transform:scale(1);opacity:.9}100%{transform:scale(2.3);opacity:0}}
+@keyframes txtWobble{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+#spinBtn:hover{filter:brightness(1.12)}
+#spinBtn:active{transform:translate(-50%,-50%) scale(.88);animation:none}
+#spinBtn.spinning{animation:hubSpin .5s linear infinite}
+#spinBtn.spinning::before,#spinBtn.spinning::after{animation-duration:.8s}
+@keyframes hubSpin{0%{transform:translate(-50%,-50%) rotate(0) scale(1)}50%{transform:translate(-50%,-50%) rotate(180deg) scale(1.06)}100%{transform:translate(-50%,-50%) rotate(360deg) scale(1)}}
+#spinBtn.used{opacity:.55;cursor:not-allowed;animation:none;filter:grayscale(.5)}
+#spinBtn.used::before,#spinBtn.used::after{display:none}
+
+/* ---------- status ---------- */
+#statusMessage{
+  position:relative;z-index:2;width:min(92vw,440px);text-align:center;margin-top:8px;padding:12px 16px;border-radius:16px;
+  font-size:.85rem;font-weight:600;color:#fde047;
+  background:rgba(255,255,255,.09);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.22);
+  box-shadow:0 8px 24px rgba(0,0,0,.25),inset 0 0 20px rgba(255,255,255,.04);
+  overflow:hidden;animation:popIn .9s 1.3s both cubic-bezier(.2,1.4,.4,1);
+}
+#statusMessage::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.25),transparent);transform:skewX(-20deg);animation:sweep 4s ease-in-out infinite}
+@keyframes sweep{0%,60%{left:-60%}100%{left:130%}}
+#statusMessage .txt{display:inline-block}
+#statusMessage .txt.swap{animation:swap .55s cubic-bezier(.2,1.4,.4,1)}
+@keyframes swap{0%{opacity:0;transform:translateY(14px) scale(.9)}100%{opacity:1;transform:none}}
+.dots i{font-style:normal;display:inline-block;animation:dot 1s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-5px);opacity:1}}
+
+footer{position:relative;z-index:2;text-align:center;font-size:.7rem;color:rgba(165,180,252,.6);padding:8px 0 2px;animation:popIn 1s 1.6s both}
+
+/* ---------- modal ---------- */
+#resultModal{
+  position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(0,0,0,.65);backdrop-filter:blur(6px);
+}
+#resultModal.show{display:flex;animation:fadeIn .35s ease forwards}
+#resultModal.hide{display:flex;animation:fadeOut .35s ease forwards}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+.card{
+  position:relative;width:min(100%,340px);padding:26px 22px 22px;border-radius:26px;text-align:center;overflow:visible;
+  background:linear-gradient(160deg,rgba(255,255,255,.18),rgba(255,255,255,.06));
+  border:1px solid rgba(250,204,21,.45);backdrop-filter:blur(14px);
+  box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 60px rgba(250,204,21,.25);
+}
+#resultModal.show .card{animation:cardOpen .85s cubic-bezier(.2,1.5,.35,1) both}
+#resultModal.hide .card{animation:cardClose .35s cubic-bezier(.6,-.3,.8,.6) both}
+@keyframes cardOpen{0%{transform:scale(0) rotate(-25deg);opacity:0}55%{transform:scale(1.14) rotate(5deg);opacity:1}80%{transform:scale(.96) rotate(-2deg)}100%{transform:none}}
+@keyframes cardClose{to{transform:scale(0) rotate(20deg);opacity:0}}
+.shock{position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px 0 0 -40px;border-radius:50%;
+  border:4px solid #fde047;opacity:0;pointer-events:none}
+#resultModal.show .shock{animation:shock 1s ease-out forwards}
+#resultModal.show .shock.b{animation-delay:.18s;border-color:#fff}
+@keyframes shock{0%{transform:scale(.2);opacity:1}100%{transform:scale(7);opacity:0}}
+.imgwrap{position:relative;width:170px;height:170px;margin:6px auto 4px;display:flex;align-items:center;justify-content:center}
+.rays{position:absolute;inset:-34px;border-radius:50%;
+  background:repeating-conic-gradient(from 0deg,rgba(253,224,71,.55) 0 8deg,transparent 8deg 20deg);
+  -webkit-mask:radial-gradient(circle,#000 25%,transparent 70%);mask:radial-gradient(circle,#000 25%,transparent 70%);
+  animation:spinSlow 12s linear infinite}
+@keyframes spinSlow{to{transform:rotate(360deg)}}
+.imgwrap::before{content:"";position:absolute;inset:6px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.75),rgba(255,255,255,.1) 70%);animation:glowPulse 1.8s ease-in-out infinite}
+@keyframes glowPulse{0%,100%{transform:scale(.92);opacity:.8}50%{transform:scale(1.08);opacity:1}}
+#modalImg{position:relative;max-width:150px;max-height:150px;object-fit:contain;filter:drop-shadow(0 12px 14px rgba(0,0,0,.5));animation:prizeFloat 2.4s ease-in-out infinite}
+#resultModal.show #modalImg{animation:prizeDrop 1s .25s cubic-bezier(.2,1.6,.4,1) both,prizeFloat 2.4s 1.25s ease-in-out infinite}
+@keyframes prizeDrop{0%{transform:translateY(-120px) scale(.2) rotate(-200deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes prizeFloat{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-10px) rotate(3deg) scale(1.04)}}
+#modalTitle{font-size:1.5rem;font-weight:800;color:#fde047;margin:6px 0 4px;text-shadow:0 3px 10px rgba(0,0,0,.4)}
+#modalTitle span{display:inline-block;animation:wave 1.6s ease-in-out infinite}
+@keyframes wave{0%,50%,100%{transform:translateY(0)}25%{transform:translateY(-7px) scale(1.15)}}
+#modalText{font-size:.9rem;color:#e2e8f0;margin-bottom:18px;opacity:0}
+#resultModal.show #modalText{animation:swap .7s .7s both cubic-bezier(.2,1.4,.4,1)}
+#closeBtn{
+  position:relative;overflow:hidden;width:100%;padding:12px;border:0;border-radius:14px;cursor:pointer;
+  background:linear-gradient(90deg,#eab308,#d97706);color:#1e1b4b;font:800 1rem 'Poppins',sans-serif;
+  box-shadow:0 8px 20px rgba(0,0,0,.35);transition:transform .2s cubic-bezier(.3,1.8,.5,1);
+  opacity:0;
+}
+#resultModal.show #closeBtn{animation:swap .7s .9s both cubic-bezier(.2,1.4,.4,1)}
+#closeBtn::after{content:"";position:absolute;top:0;left:-70%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);transform:skewX(-20deg);animation:sweep 2.2s ease-in-out infinite}
+#closeBtn:hover{transform:scale(1.05)}
+#closeBtn:active{transform:scale(.94)}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas" class="layer"></canvas>
+<canvas id="fxCanvas" class="layer"></canvas>
+
+<button id="muteBtn" aria-label="Son" class="beat"><span class="ico">🔊</span></button>
+
+<header>
+  <img src="img/logo.png" alt="Logo" class="logo">
+  <h1 id="title">Roulette de la Chance</h1>
+  <p class="sub">Tournez et tentez de gagner votre boisson favorite !</p>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <canvas id="wheelCanvas"></canvas>
+    <button id="spinBtn" aria-label="Tourner"><span>TOURNER</span></button>
+  </div>
+  <div id="statusMessage"><span class="txt" id="statusTxt">Appuyez sur le bouton central pour tourner la roue (1 seule tentative) !</span></div>
+</main>
+
+<div id="resultModal">
+  <div class="card">
+    <div class="shock"></div><div class="shock b"></div>
+    <div class="imgwrap"><div class="rays"></div><img id="modalImg" src="" alt=""></div>
+    <h3 id="modalTitle">Félicitations !</h3>
+    <p id="modalText"></p>
+    <button id="closeBtn">Fermer</button>
+  </div>
+</div>
+
+<footer>&copy; 2026 Roulette de la Chance. Tous droits réservés.</footer>
+
+<script>
+/* =====================================================================
+   1. DATA
+   ===================================================================== */
+const segments = [
+  { id:1, name:"Café",             color:"#f59e0b", img:"img/coffe.png",     winnable:true  },
+  { id:2, name:"Thé",              color:"#10b981", img:"img/tea.png",       winnable:true  },
+  { id:3, name:"Verre de vin",     color:"#ef4444", img:"img/1.png",         winnable:false },
+  { id:4, name:"Meilleure chance", color:"#6366f1", img:"img/logo.png",      winnable:false },
+  { id:5, name:"Capuccino",        color:"#8b5cf6", img:"img/cappuccino.png",winnable:false },
+  { id:6, name:"Shish Taouk",      color:"#ec4899", img:"img/Chich.png",     winnable:false },
+  { id:7, name:"Kofta",            color:"#14b8a6", img:"img/Kafta.png",     winnable:false },
+  { id:8, name:"Chawarma",         color:"#f97316", img:"img/Shawarma.png",  winnable:false }
+];
+const N = segments.length, ARC = Math.PI*2/N, TAU = Math.PI*2;
+const mod = (a,b)=>((a%b)+b)%b;
+const $ = id=>document.getElementById(id);
+
+/* =====================================================================
+   2. AUDIO  (mp3/1.mp3 spin · 2.mp3 music · 4.mp3 pop · 5.mp3 after pop)
+   ===================================================================== */
+const sfx = {
+  spin: new Audio('mp3/1.mp3'),
+  bg:   new Audio('mp3/2.mp3'),
+  pop:  new Audio('mp3/4.mp3'),
+  win:  new Audio('mp3/5.mp3')
+};
+Object.values(sfx).forEach(a=>{a.preload='auto'});
+sfx.bg.loop = true;
+const BG_VOL = .4;
+let muted = false;
+const play = a => { try{ const p=a.play(); if(p&&p.catch) p.catch(()=>{}); }catch(e){} };
+const fades = new Map();
+function fadeTo(a, v, ms, done){
+  fades.set(a,{from:a.volume,to:v,t0:performance.now(),ms,done});
+}
+function tickFades(now){
+  fades.forEach((f,a)=>{
+    const p=Math.min(1,(now-f.t0)/f.ms);
+    a.volume=Math.max(0,Math.min(1,f.from+(f.to-f.from)*p));
+    if(p>=1){fades.delete(a); f.done&&f.done();}
+  });
+}
+sfx.bg.volume = BG_VOL;
+function startMusic(){
+  const go=()=>{ play(sfx.bg); window.removeEventListener('pointerdown',go); window.removeEventListener('keydown',go); };
+  const p = sfx.bg.play();
+  if(p && p.catch) p.catch(()=>{ window.addEventListener('pointerdown',go); window.addEventListener('keydown',go); });
+}
+$('muteBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  muted=!muted;
+  Object.values(sfx).forEach(a=>a.muted=muted);
+  $('muteBtn').firstElementChild.textContent = muted?'🔇':'🔊';
+  $('muteBtn').classList.toggle('beat',!muted);
+  if(!muted) play(sfx.bg);
+});
+
+/* =====================================================================
+   3. IMAGES + STATIC WHEEL BUFFER
+   ===================================================================== */
+const WR = 284;                    // wheel radius (logical units)
+const BUF = 1500;                  // buffer px
+const buffer = document.createElement('canvas'); buffer.width=buffer.height=BUF;
+const imgs = {};
+
+function loadImages(){
+  return Promise.all(segments.map(s=>new Promise(res=>{
+    const im=new Image(); im.onload=()=>{imgs[s.img]=im;res()}; im.onerror=()=>res(); im.src=s.img;
+  })));
+}
+
+function buildWheel(){
+  const g=buffer.getContext('2d'), k=BUF/(WR*2);
+  g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,BUF,BUF);
+  g.setTransform(k,0,0,k,BUF/2,BUF/2);
+
+  for(let i=0;i<N;i++){
+    const a0=i*ARC, a1=a0+ARC, m=a0+ARC/2, s=segments[i];
+    // slice
+    const grd=g.createRadialGradient(0,0,20,0,0,WR);
+    grd.addColorStop(0,shade(s.color,-28)); grd.addColorStop(.55,s.color); grd.addColorStop(1,shade(s.color,22));
+    g.beginPath(); g.moveTo(0,0); g.arc(0,0,WR,a0,a1); g.closePath();
+    g.fillStyle=grd; g.fill();
+    // light beam
+    g.save(); g.clip();
+    const sh=g.createLinearGradient(Math.cos(a0)*WR,Math.sin(a0)*WR,Math.cos(a1)*WR,Math.sin(a1)*WR);
+    sh.addColorStop(0,'rgba(255,255,255,.22)'); sh.addColorStop(.5,'rgba(255,255,255,0)'); sh.addColorStop(1,'rgba(0,0,0,.18)');
+    g.fillStyle=sh; g.fillRect(-WR,-WR,WR*2,WR*2);
+    g.restore();
+    g.lineWidth=3; g.strokeStyle='rgba(255,255,255,.9)'; g.stroke();
+
+    // label (radial, inner)
+    g.save(); g.rotate(m);
+    const flip=Math.cos(m)<0;
+    if(flip) g.rotate(Math.PI);
+    g.textBaseline='middle';
+    let size=19; g.font=`800 ${size}px Poppins,sans-serif`;
+    const maxW=80, w=g.measureText(s.name).width;
+    if(w>maxW){size=Math.max(11,size*maxW/w); g.font=`800 ${size}px Poppins,sans-serif`;}
+    g.textAlign=flip?'right':'left';
+    const tx=flip?-70:70;
+    g.lineWidth=4; g.strokeStyle='rgba(0,0,0,.35)'; g.lineJoin='round';
+    g.strokeText(s.name,tx,0); g.fillStyle='#fff'; g.fillText(s.name,tx,0);
+    g.restore();
+
+    // picture on the OUTER part of the slice
+    const im=imgs[s.img];
+    if(im){
+      const R=206, box = s.img.includes('logo')?118:104;
+      const sc=Math.min(box/im.width,box/im.height), w2=im.width*sc, h2=im.height*sc;
+      g.save();
+      g.translate(Math.cos(m)*R,Math.sin(m)*R); g.rotate(m+Math.PI/2);
+      const halo=g.createRadialGradient(0,0,4,0,0,Math.max(w2,h2)*.62);
+      halo.addColorStop(0,'rgba(255,255,255,.55)'); halo.addColorStop(1,'rgba(255,255,255,0)');
+      g.fillStyle=halo; g.beginPath(); g.arc(0,0,Math.max(w2,h2)*.62,0,TAU); g.fill();
+      g.shadowColor='rgba(0,0,0,.55)'; g.shadowBlur=10; g.shadowOffsetY=4;
+      g.drawImage(im,-w2/2,-h2/2,w2,h2);
+      g.restore();
+    }
+  }
+  // pegs
+  for(let i=0;i<N;i++){
+    const a=i*ARC; g.save(); g.translate(Math.cos(a)*(WR-8),Math.sin(a)*(WR-8));
+    const pg=g.createRadialGradient(-1.5,-1.5,1,0,0,6);
+    pg.addColorStop(0,'#fff'); pg.addColorStop(.5,'#fde047'); pg.addColorStop(1,'#b45309');
+    g.fillStyle=pg; g.shadowColor='rgba(0,0,0,.6)'; g.shadowBlur=4;
+    g.beginPath(); g.arc(0,0,6,0,TAU); g.fill(); g.restore();
+  }
+  // inner ring
+  const ir=g.createRadialGradient(0,0,18,0,0,46);
+  ir.addColorStop(0,'rgba(0,0,0,.55)'); ir.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=ir; g.beginPath(); g.arc(0,0,46,0,TAU); g.fill();
+}
+function shade(hex,pct){
+  const n=parseInt(hex.slice(1),16); let r=n>>16,gc=(n>>8)&255,b=n&255;
+  const f=v=>Math.max(0,Math.min(255,Math.round(v+(pct/100)*255)));
+  return `rgb(${f(r)},${f(gc)},${f(b)})`;
+}
+
+/* =====================================================================
+   4. MAIN CANVAS (rim, bulbs, rotating wheel, pointer)
+   ===================================================================== */
+const canvas=$('wheelCanvas'), ctx=canvas.getContext('2d');
+const L=640, C=L/2;
+function sizeCanvas(){
+  const dpr=Math.min(window.devicePixelRatio||1,2.5);
+  const css=canvas.offsetWidth||L;   // layout size (ignores the entrance scale animation)
+  canvas.width=canvas.height=Math.round(css*dpr);
+}
+let theta=0;                 // wheel rotation (rad)
+let state='idle';            // idle | windup | spin | done
+let pointerAng=0, pointerVel=0;
+let lastIdx=null, hasSpun=false, winnerIdx=null, doneAt=0;
+let spinInfo=null;
+
+const BULBS=32;
+function drawScene(t){
+  const k=canvas.width/L;
+  ctx.setTransform(k,0,0,k,0,0);
+  ctx.clearRect(0,0,L,L);
+
+  // outer glow
+  const spinning = state==='spin'||state==='windup';
+  const glowA = spinning?.75:.45+.15*Math.sin(t*2);
+  const gl=ctx.createRadialGradient(C,C,250,C,C,320);
+  gl.addColorStop(0,`rgba(253,224,71,${glowA})`); gl.addColorStop(1,'rgba(253,224,71,0)');
+  ctx.fillStyle=gl; ctx.fillRect(0,0,L,L);
+
+  // gold rim
+  ctx.save(); ctx.translate(C,C);
+  const rim=ctx.createLinearGradient(-300,-300,300,300);
+  rim.addColorStop(0,'#fde047'); rim.addColorStop(.3,'#b45309'); rim.addColorStop(.5,'#fef3c7'); rim.addColorStop(.7,'#d97706'); rim.addColorStop(1,'#fde047');
+  ctx.beginPath(); ctx.arc(0,0,312,0,TAU); ctx.arc(0,0,WR+2,0,TAU,true);
+  ctx.fillStyle=rim; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=18; ctx.fill(); ctx.shadowBlur=0;
+  ctx.beginPath(); ctx.arc(0,0,WR+1,0,TAU); ctx.lineWidth=3; ctx.strokeStyle='rgba(120,53,15,.8)'; ctx.stroke();
+
+  // bulbs
+  const flash = state==='done' && (t-doneAt)<4;
+  for(let i=0;i<BULBS;i++){
+    const a=i/BULBS*TAU - Math.PI/2;
+    let br;
+    if(flash){ br = .5+.5*Math.sin(t*14+(i%2)*Math.PI); }
+    else if(spinning){ br = .3+.7*Math.pow(Math.max(0,Math.sin(t*10 - i*TAU/BULBS*3)),2); }
+    else { br = .35+.65*Math.pow(Math.max(0,Math.sin(t*3 - i*TAU/BULBS*2)),3); }
+    const hue = flash? (i*20+t*300)%360 : 48;
+    const bx=Math.cos(a)*299, by=Math.sin(a)*299;
+    const col=`hsla(${hue},100%,${55+25*br}%,`;
+    const bg=ctx.createRadialGradient(bx,by,0,bx,by,14);
+    bg.addColorStop(0,col+(.9*br+.1)+')'); bg.addColorStop(1,col+'0)');
+    ctx.fillStyle=bg; ctx.beginPath(); ctx.arc(bx,by,14,0,TAU); ctx.fill();
+    ctx.fillStyle=`hsl(${hue},100%,${70+20*br}%)`; ctx.beginPath(); ctx.arc(bx,by,5.2,0,TAU); ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(bx-1.4,by-1.4,1.7,0,TAU); ctx.fill();
+  }
+
+  // wheel
+  ctx.save(); ctx.rotate(theta);
+  ctx.drawImage(buffer,-WR,-WR,WR*2,WR*2);
+  // winner highlight
+  if(winnerIdx!==null && state==='done'){
+    const a0=winnerIdx*ARC, pulse=.25+.25*Math.sin((t-doneAt)*8);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,WR,a0,a0+ARC); ctx.closePath();
+    ctx.fillStyle=`rgba(255,255,255,${pulse})`; ctx.fill();
+    ctx.lineWidth=5; ctx.strokeStyle=`rgba(253,224,71,${.6+pulse})`; ctx.stroke();
+  }
+  ctx.restore();
+
+  // inner vignette
+  const vg=ctx.createRadialGradient(0,0,WR*.7,0,0,WR);
+  vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,.28)');
+  ctx.fillStyle=vg; ctx.beginPath(); ctx.arc(0,0,WR,0,TAU); ctx.fill();
+
+  // hub ring
+  const hr=ctx.createLinearGradient(-60,-60,60,60);
+  hr.addColorStop(0,'#fef3c7'); hr.addColorStop(.5,'#b45309'); hr.addColorStop(1,'#fde047');
+  ctx.beginPath(); ctx.arc(0,0,64,0,TAU); ctx.fillStyle=hr; ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=14; ctx.fill(); ctx.shadowBlur=0;
+  ctx.restore();
+
+  // pointer
+  ctx.save(); ctx.translate(C,22); ctx.rotate(pointerAng);
+  ctx.shadowColor='rgba(0,0,0,.6)'; ctx.shadowBlur=10; ctx.shadowOffsetY=5;
+  const pg=ctx.createLinearGradient(-20,0,20,60);
+  pg.addColorStop(0,'#fff7ad'); pg.addColorStop(.5,'#facc15'); pg.addColorStop(1,'#b45309');
+  ctx.beginPath(); ctx.moveTo(-21,-6); ctx.quadraticCurveTo(0,-26,21,-6); ctx.lineTo(0,66); ctx.closePath();
+  ctx.fillStyle=pg; ctx.fill(); ctx.shadowColor='transparent';
+  ctx.lineWidth=2.5; ctx.strokeStyle='#fff'; ctx.stroke();
+  ctx.fillStyle='#7c2d12'; ctx.beginPath(); ctx.arc(0,-2,6,0,TAU); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(-1.5,-3.5,2,0,TAU); ctx.fill();
+  ctx.restore();
+}
+
+/* =====================================================================
+   5. SPIN LOGIC  (50% Café / 50% Thé – unchanged)
+   ===================================================================== */
+const easeOutQuart = p=>1-Math.pow(1-p,4);
+const easeOutBack  = p=>{const c1=1.9,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+
+function setStatus(html,dots){
+  const el=$('statusTxt'); el.classList.remove('swap'); void el.offsetWidth;
+  el.innerHTML=html; el.classList.add('swap');
+}
+
+function spinWheel(){
+  if(hasSpun){
+    showModal("Attention","Vous avez déjà utilisé votre seule tentative !","img/logo.png",false);
+    return;
+  }
+  hasSpun=true;
+  const btn=$('spinBtn'); btn.classList.add('spinning');
+  setStatus('La roue tourne<span class="dots"><i>.</i><i>.</i><i>.</i></span>');
+
+  const targetIndex = Math.random()<0.5 ? 0 : 1;
+  // pointer sits at -90°. centre of slice i is at theta+(i+.5)*ARC
+  const jitter=(Math.random()-.5)*ARC*.6;
+  const targetTheta = -Math.PI/2 - (targetIndex+.5)*ARC + jitter;
+  const total = mod(targetTheta-theta,TAU) + TAU*(6+Math.floor(Math.random()*2));
+  const dur = 5600 + Math.random()*900;
+  spinInfo={t0:performance.now(),windup:650,dur,from:theta,total,back:.42,fromWind:theta};
+  state='windup';
+
+  // spin sound
+  const s=sfx.spin; s.currentTime=0; s.volume=1; s.loop=false;
+  if(s.duration && isFinite(s.duration) && s.duration < dur/1000-.4) s.loop=true;
+  play(s);
+  fadeTo(sfx.bg,.15,600);
+  burst(window.innerWidth/2, stageCenter().y, 'spark', 30);
+}
+
+function stageCenter(){
+  const r=canvas.getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2,r:r.width/2};
+}
+
+function updateWheel(now,dt){
+  if(state==='idle'){
+    theta += dt*.35;                       // slow lazy drift
+  } else if(state==='windup'){
+    const p=Math.min(1,(now-spinInfo.t0)/spinInfo.windup);
+    theta = spinInfo.from - spinInfo.back*Math.sin(p*Math.PI/2)*1; // pull back
+    if(p>=1){ state='spin'; spinInfo.t1=now; spinInfo.fromSpin=theta; }
+  } else if(state==='spin'){
+    const p=Math.min(1,(now-spinInfo.t1)/spinInfo.dur);
+    theta = spinInfo.fromSpin + (spinInfo.total+spinInfo.back)*easeOutQuart(p);
+    if(p>=1){ finishSpin(now); }
+  }
+
+  // pointer ticks
+  const f=(-Math.PI/2-theta)/ARC, idx=Math.floor(f);
+  if(lastIdx!==null && idx!==lastIdx && (state==='spin'||state==='windup'||state==='idle')){
+    const speed=Math.min(1,Math.abs(idx-lastIdx)>1?1:(state==='spin'?(1-(now-spinInfo.t1)/spinInfo.dur):.3));
+    pointerVel -= 14 + 20*speed;
+    if(state==='spin'||state==='idle'){
+      const c=stageCenter(); if(Math.random()<.9) burst(c.x,c.y-c.r*.88,'tick',2+Math.round(speed*2));
+    }
+  }
+  lastIdx=idx;
+  // pointer spring
+  const k=260,c=14;
+  pointerVel += (-k*pointerAng - c*pointerVel)*dt;
+  pointerAng += pointerVel*dt;
+  pointerAng = Math.max(-.7,Math.min(.35,pointerAng));
+}
+
+function finishSpin(now){
+  state='done'; doneAt=now/1000;
+  winnerIdx = mod(Math.floor((-Math.PI/2-theta)/ARC),N);
+  const win=segments[winnerIdx];
+  $('spinBtn').classList.remove('spinning'); $('spinBtn').classList.add('used');
+  $('spinBtn').firstElementChild.textContent='✓';
+  // stop spin sound softly
+  fadeTo(sfx.spin,0,500,()=>{sfx.spin.pause();sfx.spin.currentTime=0;sfx.spin.volume=1;sfx.spin.loop=false});
+  const stage=$('stage'); stage.classList.remove('bump'); void stage.offsetWidth; stage.classList.add('bump');
+  pointerVel -= 40;
+  if(win.winnable){
+    setStatus(`🎉 Résultat : Vous avez gagné ${win.name} !`);
+    const c=stageCenter(); burst(c.x,c.y,'spark',60);
+  } else {
+    setStatus("Résultat : 0 — Vous n'avez rien gagné cette fois.");
+  }
+  setTimeout(()=>{
+    if(win.winnable) showModal("Félicitations !",`Vous avez gagné : ${win.name}`,win.img,true);
+    else showModal("Dommage !","Résultat : 0 — Aucun gain cette fois.",win.img,false);
+  },1100);
+}
+
+/* =====================================================================
+   6. MODAL
+   ===================================================================== */
+let popChain=false;
+function waveText(el,text){
+  el.innerHTML=''; [...text].forEach((ch,i)=>{
+    const s=document.createElement('span'); s.textContent=ch===' '?' ':ch; s.style.animationDelay=(i*.07)+'s'; el.appendChild(s);
+  });
+}
+function showModal(title,text,img,win){
+  waveText($('modalTitle'),title);
+  $('modalText').textContent=text;
+  $('modalImg').src=img;
+  const m=$('resultModal'); m.classList.remove('hide'); m.classList.add('show');
+  // box pops open → 4.mp3 then 5.mp3
+  fadeTo(sfx.bg,.1,300);
+  const pop=sfx.pop, after=sfx.win;
+  pop.currentTime=0; after.pause(); after.currentTime=0;
+  let chained=false;
+  const next=()=>{ if(chained)return; chained=true; pop.onended=pop.onerror=null; play(after); };
+  pop.onended=next; pop.onerror=next;
+  const pr=pop.play(); if(pr&&pr.catch) pr.catch(next);
+  after.onended=()=>fadeTo(sfx.bg,BG_VOL,1200);
+  after.onerror=()=>fadeTo(sfx.bg,BG_VOL,1200);
+  // visual pop
+  const w=window.innerWidth,h=window.innerHeight;
+  burst(w/2,h/2,'spark',50);
+  if(win){ confetti(); fireworks(); }
+  else { burst(w/2,h/2,'rain',40); }
+}
+function closeModal(){
+  const m=$('resultModal'); m.classList.remove('show'); m.classList.add('hide');
+  setTimeout(()=>{m.classList.remove('hide')},350);
+  fadeTo(sfx.bg,BG_VOL,1000);
+  if(state==='done'){ const s=$('stage'); s.classList.remove('shake'); }
+}
+$('closeBtn').addEventListener('click',closeModal);
+$('spinBtn').addEventListener('click',spinWheel);
+
+/* =====================================================================
+   7. PARTICLES (full-screen overlay + animated background)
+   ===================================================================== */
+const fx=$('fxCanvas'), fctx=fx.getContext('2d');
+const bgc=$('bgCanvas'), bctx=bgc.getContext('2d');
+function sizeFx(){
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  [fx,bgc].forEach(c=>{c.width=window.innerWidth*dpr;c.height=window.innerHeight*dpr});
+  fctx.setTransform(dpr,0,0,dpr,0,0); bctx.setTransform(dpr,0,0,dpr,0,0);
+}
+const parts=[];
+const COLORS=['#fde047','#f97316','#ec4899','#8b5cf6','#10b981','#38bdf8','#ef4444','#ffffff'];
+const rnd=(a,b)=>a+Math.random()*(b-a);
+
+function confetti(){
+  const w=window.innerWidth;
+  for(let side=0;side<2;side++){
+    for(let i=0;i<110;i++){
+      const x=side?w+10:-10, ang=side?rnd(Math.PI*1.05,Math.PI*1.4):rnd(-Math.PI*.4,-Math.PI*.05);
+      const sp=rnd(10,26);
+      parts.push({k:'conf',x,y:window.innerHeight*.75,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,g:.32,
+        life:rnd(3.5,5.5),age:0,rot:rnd(0,TAU),vr:rnd(-.3,.3),w:rnd(6,12),h:rnd(10,18),c:COLORS[(Math.random()*COLORS.length)|0],flip:rnd(0,TAU)});
+    }
+  }
+  for(let i=0;i<90;i++){ // rain from top
+    parts.push({k:'conf',x:rnd(0,w),y:rnd(-300,-10),vx:rnd(-1.5,1.5),vy:rnd(2,5),g:.04,life:rnd(4,6),age:0,
+      rot:rnd(0,TAU),vr:rnd(-.2,.2),w:rnd(6,11),h:rnd(10,16),c:COLORS[(Math.random()*COLORS.length)|0],flip:rnd(0,TAU)});
+  }
+}
+function fireworks(){
+  for(let n=0;n<6;n++) setTimeout(()=>{
+    const x=rnd(.15,.85)*window.innerWidth, y=rnd(.12,.5)*window.innerHeight, col=COLORS[(Math.random()*7)|0];
+    for(let i=0;i<46;i++){
+      const a=i/46*TAU+rnd(-.05,.05), sp=rnd(3,8);
+      parts.push({k:'fw',x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:.07,life:rnd(1,1.6),age:0,c:col,r:rnd(1.6,3)});
+    }
+  },n*420);
+}
+function burst(x,y,kind,n){
+  for(let i=0;i<n;i++){
+    if(kind==='spark'){
+      const a=rnd(0,TAU), sp=rnd(2,10);
+      parts.push({k:'fw',x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,g:.1,life:rnd(.6,1.2),age:0,c:COLORS[(Math.random()*COLORS.length)|0],r:rnd(1.5,3.5)});
+    } else if(kind==='tick'){
+      parts.push({k:'fw',x:x+rnd(-8,8),y,vx:rnd(-3,3),vy:rnd(-4,-1),g:.2,life:rnd(.3,.6),age:0,c:'#fde047',r:rnd(1.2,2.4)});
+    } else if(kind==='rain'){
+      parts.push({k:'drop',x:rnd(0,window.innerWidth),y:rnd(-200,0),vx:0,vy:rnd(4,9),g:.1,life:3,age:0,c:'rgba(165,180,252,.8)',r:rnd(1.5,3)});
+    }
+  }
+}
+function drawParts(dt){
+  fctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  fctx.globalCompositeOperation='source-over';
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i]; p.age+=dt;
+    if(p.age>p.life||p.y>window.innerHeight+40){parts.splice(i,1);continue;}
+    const s=dt*60;
+    p.vy+=p.g*s; p.x+=p.vx*s; p.y+=p.vy*s;
+    if(p.k==='conf'){
+      p.vx*=.992; p.vy=Math.min(p.vy,6.5)*0.995+p.g*s*.1; p.rot+=p.vr*s; p.flip+=.18*s;
+      fctx.save(); fctx.translate(p.x,p.y); fctx.rotate(p.rot); fctx.scale(1,Math.cos(p.flip));
+      fctx.globalAlpha=Math.min(1,(p.life-p.age)*1.5); fctx.fillStyle=p.c; fctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); fctx.restore();
+    } else if(p.k==='fw'){
+      const a=Math.max(0,1-p.age/p.life); fctx.globalCompositeOperation='lighter';
+      fctx.globalAlpha=a; fctx.fillStyle=p.c; fctx.beginPath(); fctx.arc(p.x,p.y,p.r*(.5+a),0,TAU); fctx.fill();
+      fctx.globalAlpha=a*.35; fctx.beginPath(); fctx.arc(p.x-p.vx*2,p.y-p.vy*2,p.r*a,0,TAU); fctx.fill();
+      fctx.globalCompositeOperation='source-over';
+    } else if(p.k==='drop'){
+      fctx.globalAlpha=Math.min(1,p.life-p.age); fctx.strokeStyle=p.c; fctx.lineWidth=p.r; fctx.beginPath(); fctx.moveTo(p.x,p.y); fctx.lineTo(p.x,p.y-12); fctx.stroke();
+    }
+  }
+  fctx.globalAlpha=1;
+}
+
+// background bubbles + twinkling stars
+const bubbles=[], stars=[];
+function initBg(){
+  bubbles.length=0; stars.length=0;
+  const W=window.innerWidth,H=window.innerHeight;
+  for(let i=0;i<26;i++) bubbles.push({x:rnd(0,W),y:rnd(0,H),r:rnd(6,38),vy:rnd(.12,.55),ph:rnd(0,TAU),amp:rnd(10,40),a:rnd(.05,.16)});
+  for(let i=0;i<70;i++) stars.push({x:rnd(0,W),y:rnd(0,H),r:rnd(.6,1.8),ph:rnd(0,TAU),sp:rnd(.8,2.5)});
+}
+function drawBg(t){
+  const W=window.innerWidth,H=window.innerHeight;
+  bctx.clearRect(0,0,W,H);
+  stars.forEach(s=>{
+    bctx.globalAlpha=.25+.75*Math.abs(Math.sin(t*s.sp+s.ph)); bctx.fillStyle='#fff';
+    bctx.beginPath(); bctx.arc(s.x,s.y,s.r,0,TAU); bctx.fill();
+  });
+  bubbles.forEach(b=>{
+    b.y-=b.vy; if(b.y<-b.r*2){b.y=H+b.r*2;b.x=rnd(0,W);}
+    const x=b.x+Math.sin(t*.8+b.ph)*b.amp;
+    const g=bctx.createRadialGradient(x-b.r*.3,b.y-b.r*.3,b.r*.1,x,b.y,b.r);
+    g.addColorStop(0,`rgba(255,255,255,${b.a*2})`); g.addColorStop(1,`rgba(165,180,252,${b.a*.4})`);
+    bctx.globalAlpha=1; bctx.fillStyle=g; bctx.beginPath(); bctx.arc(x,b.y,b.r,0,TAU); bctx.fill();
+    bctx.strokeStyle=`rgba(255,255,255,${b.a*1.5})`; bctx.lineWidth=1; bctx.stroke();
+  });
+  bctx.globalAlpha=1;
+}
+
+/* sparkles flying off the rim while spinning */
+function rimSparkles(){
+  if(state!=='spin') return;
+  const c=stageCenter(), p=Math.min(1,(performance.now()-spinInfo.t1)/spinInfo.dur), rate=(1-p);
+  if(Math.random()<rate*.9){
+    const a=rnd(0,TAU), r=c.r*.97;
+    parts.push({k:'fw',x:c.x+Math.cos(a)*r,y:c.y+Math.sin(a)*r,vx:Math.cos(a+Math.PI/2)*rnd(2,6)*rate,vy:Math.sin(a+Math.PI/2)*rnd(2,6)*rate,
+      g:.05,life:rnd(.4,.9),age:0,c:COLORS[(Math.random()*COLORS.length)|0],r:rnd(1.4,3)});
+  }
+}
+
+/* =====================================================================
+   8. LOOP + BOOT
+   ===================================================================== */
+let last=performance.now();
+function frame(nowMs){
+  const dt=Math.min(.05,(nowMs-last)/1000); last=nowMs;
+  tickFades(nowMs);
+  updateWheel(nowMs,dt);
+  drawScene(nowMs/1000);
+  rimSparkles();
+  drawParts(dt);
+  drawBg(nowMs/1000);
+  requestAnimationFrame(frame);
+}
+
+// header/main stagger entrance
+document.querySelector('header').classList.add('pop-in');
+
+window.addEventListener('resize',()=>{sizeCanvas();sizeFx();initBg();});
+window.addEventListener('load',()=>{
+  sizeCanvas(); sizeFx(); initBg();
+  buildWheel();                    // plain wheel immediately
+  requestAnimationFrame(frame);
+  loadImages().then(buildWheel);   // rebuild once pictures are loaded
+  startMusic();
+});
+
+/* =====================================================================
+   9. Code inspection protection (unchanged from the original)
+   ===================================================================== */
+document.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('keydown',e=>{
+  if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&['I','i','J','j','C','c'].includes(e.key))||(e.ctrlKey&&(e.key==='U'||e.key==='u'))){
+    e.preventDefault(); return false;
+  }
+});
+setInterval(()=>{
+  const b=performance.now(); debugger; const a=performance.now();
+  if(a-b>100){ document.body.innerHTML="<div style='display:flex;justify-content:center;align-items:center;height:100vh;background:#000;color:#fff;font-family:sans-serif;'><h2>Accès interdit - Outils de développement détectés</h2></div>"; }
+},1000);
+</script>
+</body>
+</html>
